@@ -265,7 +265,6 @@ MonoBehaviour:
   wallPrefab: {fileID: 5188028627105092103, guid: 9f69f8c856f80a94fa91a2fbc8012b09, type: 3}
   boxMoveSound: {fileID: 404518666}
   clearSound: {fileID: 404518667}
-  isCleared: 0
 --- !u!4 &404518665
 Transform:
   m_ObjectHideFlags: 0
@@ -480,7 +479,7 @@ AudioSource:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 404518663}
-  m_Enabled: 0
+  m_Enabled: 1
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: 81407880819a7ec4aa7f7e97b616479d, type: 3}
@@ -1151,7 +1150,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &2015242187
 MonoBehaviour:
   m_ObjectHideFlags: 0

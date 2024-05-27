@@ -27,8 +27,10 @@ public class GameManagerScript : MonoBehaviour
     // クリアした際のSE
     public AudioSource clearSound;
 
-    // ゲームをクリアしているか
-    public bool isCleared;
+    // ステージ関連
+    private int[][,] maps;
+    private int currentStageIndex = 0;
+    private bool isCleared;
 
     // 配列の宣言
     int[,] map;
@@ -39,6 +41,8 @@ public class GameManagerScript : MonoBehaviour
     // クリアした時に消すものリスト
     List<GameObject> objectsToRemove = new List<GameObject>();
 
+
+    // マップの初期化
     void InitializeMap()
     {
         // 二重for文で二次元配列の情報を出力
@@ -46,30 +50,32 @@ public class GameManagerScript : MonoBehaviour
         {
             for (int x = 0; x < map.GetLength(1); x++)
             {
-
                 if (map[y, x] == 1)
                 {
                     field[y, x] = Instantiate(
                         playerPrefab,
                         IndexToPosition(new Vector2Int(x, y)),
                         Quaternion.identity
-                        );
+                    );
+                    objectsToRemove.Add(field[y, x]);
                 }
                 if (map[y, x] == 2)
                 {
                     field[y, x] = Instantiate(
-                       boxPrefab,
-                       IndexToPosition(new Vector2Int(x, y)),
-                       Quaternion.identity
-                       );
+                        boxPrefab,
+                        IndexToPosition(new Vector2Int(x, y)),
+                        Quaternion.identity
+                    );
+                    objectsToRemove.Add(field[y, x]);
                 }
                 if (map[y, x] == 3)
                 {
                     field[y, x] = Instantiate(
-                      goalPrefab,
-                      IndexToPosition(new Vector2Int(x, y)),
-                      Quaternion.identity
-                      );
+                        goalPrefab,
+                        IndexToPosition(new Vector2Int(x, y)),
+                        Quaternion.identity
+                    );
+                    objectsToRemove.Add(field[y, x]);
                 }
                 if (map[y, x] == 4)
                 {
@@ -78,6 +84,7 @@ public class GameManagerScript : MonoBehaviour
                         IndexToPosition(new Vector2Int(x, y)),
                         Quaternion.identity
                     );
+                    objectsToRemove.Add(field[y, x]);
                 }
             }
         }
@@ -205,24 +212,25 @@ public class GameManagerScript : MonoBehaviour
         return true;
     }
 
+    // 現在のフィールドをクリアする処理
+    void ClearField()
+    {
+        // 現在のフィールドにあるオブジェクトを削除
+        foreach (GameObject obj in objectsToRemove)
+        {
+            //obj.SetActive(false);
+            Destroy(obj);
+        }
+        objectsToRemove.Clear();
+        // フィールド配列をリセット
+        //field = new GameObject[map.GetLength(0), map.GetLength(1)];
+    }
+
     // ゲームをリセットする処理
     void ResetGame()
     {
         // 現在のフィールドをクリア
-        for (int y = 0; y < field.GetLength(0); y++)
-        {
-            for (int x = 0; x < field.GetLength(1); x++)
-            {
-                if (field[y, x] != null)
-                {
-                    Destroy(field[y, x]);
-                    field[y, x] = null;
-                }
-            }
-        }
-
-        // クリア時に削除するオブジェクトをリストに追加する前に、以前のオブジェクトをクリア
-        objectsToRemove.Clear();
+        ClearField();
 
         // 初期マップをコピー
         map = (int[,])initialMap.Clone();
@@ -235,32 +243,83 @@ public class GameManagerScript : MonoBehaviour
         isCleared = false;
     }
 
+    // ステージの読み込み
+    void LoadStage(int stageIndex)
+    {
+
+        // 現在のフィールドをクリア
+        ClearField();
+
+        // マップをロード
+        map = (int[,])maps[stageIndex].Clone();
+        initialMap = (int[,])map.Clone();
+
+        // フィールド初期化
+        field = new GameObject[map.GetLength(0), map.GetLength(1)];
+        // マップ初期化
+        InitializeMap();
+
+        // クリア状態をリセット
+        isCleared = false;
+        clearText.SetActive(false);
+        currentStageIndex = stageIndex;
+    }
+
+
     // Start is called before the first frame update
     void Start()
     {
         Screen.SetResolution(1280, 720, false);
 
-        // 配列の作成と初期化
-        map = new int[,] {
+        // ステージのマップを定義
+        maps = new int[][,]
+        {
+            // ステージ1
+            new int[,] {
+                // マップデータをここに書く
             { 4, 4, 4, 4, 4, 4, 4, 4, 4, 4},
             { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
-            { 4, 0, 0, 0, 0, 3, 3, 3, 0, 4},
-            { 4, 0, 0, 0, 0 ,2, 2, 2, 0, 4},
             { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
-            { 4, 0, 1, 0, 0, 0, 0, 0, 0, 4},
-            { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
+            { 4, 0, 0, 0, 0 ,0, 0, 0, 0, 4},
+            { 4, 0, 0, 0, 0, 2, 3, 0, 0, 4},
+            { 4, 0, 1, 0, 0, 2, 3, 0, 0, 4},
+            { 4, 0, 0, 0, 0, 2, 3, 0, 0, 4},
             { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
             { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
             { 4, 4, 4, 4, 4, 4, 4, 4, 4, 4},
+            },
+            // ステージ2
+            new int[,] {
+                // マップデータをここに書く
+            { 4, 4, 4, 4, 4, 4, 4, 4, 4, 4},
+            { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
+            { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
+            { 4, 0, 0, 0, 0 ,0, 0, 0, 0, 4},
+            { 4, 0, 0, 0, 0, 0, 2, 3, 0, 4},
+            { 4, 0, 0, 1, 0, 0, 2, 3, 0, 4},
+            { 4, 0, 0, 0, 0, 0, 2, 3, 0, 4},
+            { 4, 0, 0, 0, 0, 0, 2, 3, 0, 4},
+            { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
+            { 4, 4, 4, 4, 4, 4, 4, 4, 4, 4},
+            },
+            // ステージ3
+            new int[,] {
+                // マップデータをここに書く
+            { 4, 4, 4, 4, 4, 4, 4, 4, 4, 4},
+            { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
+            { 4, 0, 0, 3, 0, 3, 0, 0, 0, 4},
+            { 4, 0, 0, 2, 3 ,2, 0, 0, 0, 4},
+            { 4, 0, 3, 2, 2, 2, 3, 0, 0, 4},
+            { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
+            { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
+            { 4, 0, 0, 0, 1, 0, 0, 0, 0, 4},
+            { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
+            { 4, 4, 4, 4, 4, 4, 4, 4, 4, 4},
+            },
         };
 
-        // 初期マップを保存
-        initialMap = (int[,])map.Clone();
-
-        field = new GameObject[map.GetLength(0), map.GetLength(1)];
-
-        // 二重for文で二次元配列の情報を出力
-        InitializeMap();
+        // 最初のステージを読み込む
+        LoadStage(currentStageIndex);
     }
 
     // Update is called once per frame
@@ -269,6 +328,7 @@ public class GameManagerScript : MonoBehaviour
 
         if (!IsCleard())
         {
+
             if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D))
             {
 
@@ -318,6 +378,20 @@ public class GameManagerScript : MonoBehaviour
             }
         }
 
+        // ステージ切り替え
+        if (Input.GetKeyDown(KeyCode.Alpha1))
+        {
+            LoadStage(0);
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha2))
+        {
+            LoadStage(1);
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha3))
+        {
+            LoadStage(2);
+        }
+
         // もしクリアしていたら
         if (IsCleard() && !isCleared)
         {
@@ -334,10 +408,8 @@ public class GameManagerScript : MonoBehaviour
             }
 
             // リスト内のオブジェクトを削除
-            foreach (GameObject obj in objectsToRemove)
-            {
-                obj.SetActive(false);
-            }
+            // 現在のフィールドをクリアx
+            ClearField();
         }
 
         // Rキーが押されたらリセット
