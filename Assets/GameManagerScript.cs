@@ -1,40 +1,103 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 public class GameManagerScript : MonoBehaviour
 {
+    /*/////////////////////////////////////
+                プレファブ
+    /////////////////////////////////////*/
+    // プレイヤー
+    public GameObject playerPrefab;
+    // ボックス
+    public GameObject boxPrefab;
+    // ゴール
+    public GameObject goalPrefab;
+    // パーティクル
+    public GameObject particlePrefab;
+    // クリア判定
+    public GameObject clearText;
+    // 壁
+    public GameObject wallPrefab;
+
+
+    // ボックスを移動させる際のSE
+    public AudioSource boxMoveSound;
+    // クリアした際のSE
+    public AudioSource clearSound;
+
+    // ゲームをクリアしているか
+    public bool isCleared;
 
     // 配列の宣言
-    int[] map;
+    int[,] map;
+    int[,] initialMap;
+    // ゲーム管理用の配列
+    GameObject[,] field;
 
-    // 文字列を出力するメソッド
-    void PrintArray()
+    // クリアした時に消すものリスト
+    List<GameObject> objectsToRemove = new List<GameObject>();
+
+    void InitializeMap()
     {
-
-        // 文字列の宣言と初期化
-        string debugText = "";
-
-        for (int i = 0; i < map.Length; i++)
+        // 二重for文で二次元配列の情報を出力
+        for (int y = 0; y < map.GetLength(0); y++)
         {
-            // 文字列に結合
-            debugText += map[i].ToString() + ",";
+            for (int x = 0; x < map.GetLength(1); x++)
+            {
+
+                if (map[y, x] == 1)
+                {
+                    field[y, x] = Instantiate(
+                        playerPrefab,
+                        IndexToPosition(new Vector2Int(x, y)),
+                        Quaternion.identity
+                        );
+                }
+                if (map[y, x] == 2)
+                {
+                    field[y, x] = Instantiate(
+                       boxPrefab,
+                       IndexToPosition(new Vector2Int(x, y)),
+                       Quaternion.identity
+                       );
+                }
+                if (map[y, x] == 3)
+                {
+                    field[y, x] = Instantiate(
+                      goalPrefab,
+                      IndexToPosition(new Vector2Int(x, y)),
+                      Quaternion.identity
+                      );
+                }
+                if (map[y, x] == 4)
+                {
+                    field[y, x] = Instantiate(
+                        wallPrefab,
+                        IndexToPosition(new Vector2Int(x, y)),
+                        Quaternion.identity
+                    );
+                }
+            }
         }
-        // 文字列の出力
-        Debug.Log(debugText);
     }
 
     // 1の値が格納されているインデックスを取得する処理のメソッド
-    int GetPlayerIndex()
+    Vector2Int GetPlayerIndex()
     {
-        for (int i = 0; i < map.Length; i++)
+        for (int y = 0; y < map.GetLength(0); y++)
         {
-            if (map[i] == 1)
+            for (int x = 0; x < map.GetLength(1); x++)
             {
-                return i;
+                if (field[y, x] == null) { continue; }
+                if (field[y, x].tag == "Player")
+                {
+                    return new Vector2Int(x, y);
+                }
             }
         }
-        return -1;
+        return new Vector2Int(-1, -1);
     }
 
     /// <summary>
@@ -44,59 +107,243 @@ public class GameManagerScript : MonoBehaviour
     /// <param name="moveFrom">動く先のインデックス</param>
     /// <param name="moveTo">動く前のインデックス</param>
     /// <returns></returns>
-    bool MoveNumber(int number, int moveFrom, int moveTo)
+    bool MoveNumber(string tag, Vector2Int moveFrom, Vector2Int moveTo)
     {
-        if (moveTo < 0 || moveTo >= map.Length)
+        if (moveTo.y < 0 || moveTo.y >= map.GetLength(0)) { return false; }
+        if (moveTo.x < 0 || moveTo.x >= map.GetLength(1)) { return false; }
+
+        if (field[moveTo.y, moveTo.x] != null)
         {
-            return false;
+            if (field[moveTo.y, moveTo.x].tag == "Box")
+            {
+                Vector2Int nextMove = moveTo + (moveTo - moveFrom);
+                Vector2Int velocity = moveTo - moveFrom;
+
+                // 移動先にさらにボックスがある場合は移動を中止
+                if (field[nextMove.y, nextMove.x] != null && field[nextMove.y, nextMove.x].tag == "Box")
+                {
+                    return false;
+                }
+
+                bool success = MoveNumber("Box", moveTo, moveTo + velocity);
+
+              
+                    boxMoveSound.Play();
+                
+
+                if (!success) { return false; }
+            }
+            else if (field[moveTo.y, moveTo.x].tag == "Wall")
+            {
+                return false; // 壁がある場所には移動できない
+            }
         }
 
-        if (map[moveTo] == 2)
-        {
-            int velocity = moveTo - moveFrom;
+        // パーティクルを生成する
+        GenerateParticles(IndexToPosition(moveFrom));
 
-            bool success = MoveNumber(2, moveTo, moveTo + velocity);
+        Vector3 moveToPosition = IndexToPosition(moveTo);
+        field[moveFrom.y, moveFrom.x].GetComponent<Move>().MoveTo(moveToPosition);
 
-            if (!success) { return false; }
-        }
-        map[moveTo] = number;
-        map[moveFrom] = 0;
+        field[moveTo.y, moveTo.x] = field[moveFrom.y, moveFrom.x];
+        field[moveFrom.y, moveFrom.x] = null;
+
         return true;
+    }
+
+    // パーティクルの関数
+    void GenerateParticles(Vector3 position)
+    {
+        // パーティクルの数を指定
+        int particleCount = 5;
+        for (int i = 0; i < particleCount; i++)
+        {
+            Instantiate(particlePrefab, position, Quaternion.identity);
+        }
+    }
+
+    Vector3 IndexToPosition(Vector2Int index)
+    {
+        return new Vector3(
+            index.x - map.GetLength(1) / 2 + 0.5f,
+            -index.y + map.GetLength(0) / 2,
+            0
+            );
+    }
+
+    // クリアする処理
+    bool IsCleard()
+    {
+        // Vector2Int型の可変長配列の作成
+        List<Vector2Int> goals = new List<Vector2Int>();
+
+        for (int y = 0; y < map.GetLength(0); y++)
+        {
+            for (int x = 0; x < map.GetLength(1); x++)
+            {
+                // 格納場所か否かを判断
+                if (map[y, x] == 3)
+                {
+                    // 格納場所のインデックスを控えておく
+                    goals.Add(new Vector2Int(x, y));
+                }
+            }
+        }
+
+        // 要素数はgoals.Countで取得
+        for (int i = 0; i < goals.Count; i++)
+        {
+            GameObject f = field[goals[i].y, goals[i].x];
+            if (f == null || f.tag != "Box")
+            {
+                // 1つでも箱がなかったら条件未達成
+                return false;
+            }
+        }
+
+        // 条件未達成でなければ条件達成
+        return true;
+    }
+
+    // ゲームをリセットする処理
+    void ResetGame()
+    {
+        // 現在のフィールドをクリア
+        for (int y = 0; y < field.GetLength(0); y++)
+        {
+            for (int x = 0; x < field.GetLength(1); x++)
+            {
+                if (field[y, x] != null)
+                {
+                    Destroy(field[y, x]);
+                    field[y, x] = null;
+                }
+            }
+        }
+
+        // クリア時に削除するオブジェクトをリストに追加する前に、以前のオブジェクトをクリア
+        objectsToRemove.Clear();
+
+        // 初期マップをコピー
+        map = (int[,])initialMap.Clone();
+
+        // フィールドを再構築
+        InitializeMap();
+        // クリアテキストを非表示にする
+        clearText.SetActive(false);
+        // クリアしていない状態に
+        isCleared = false;
     }
 
     // Start is called before the first frame update
     void Start()
     {
+        Screen.SetResolution(1280, 720, false);
+
         // 配列の作成と初期化
-        map = new int[] { 0, 0, 0, 1, 0, 2, 0, 0, 0 };
-        PrintArray();
+        map = new int[,] {
+            { 4, 4, 4, 4, 4, 4, 4, 4, 4, 4},
+            { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
+            { 4, 0, 0, 0, 0, 3, 3, 3, 0, 4},
+            { 4, 0, 0, 0, 0 ,2, 2, 2, 0, 4},
+            { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
+            { 4, 0, 1, 0, 0, 0, 0, 0, 0, 4},
+            { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
+            { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
+            { 4, 0, 0, 0, 0, 0, 0, 0, 0, 4},
+            { 4, 4, 4, 4, 4, 4, 4, 4, 4, 4},
+        };
+
+        // 初期マップを保存
+        initialMap = (int[,])map.Clone();
+
+        field = new GameObject[map.GetLength(0), map.GetLength(1)];
+
+        // 二重for文で二次元配列の情報を出力
+        InitializeMap();
     }
 
     // Update is called once per frame
     void Update()
     {
 
-        if (Input.GetKeyDown(KeyCode.RightArrow))
+        if (!IsCleard())
         {
+            if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D))
+            {
 
-            // 右移動処理
+                // 右移動処理
 
-            int playerIndex = GetPlayerIndex();
+                Vector2Int playerIndex = GetPlayerIndex();
 
-            MoveNumber(1, playerIndex, playerIndex + 1);
+                MoveNumber("Player", playerIndex, playerIndex + new Vector2Int(1, 0));
+            }
+            else if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A))
+            {
+                // 左移動処理
 
-            PrintArray();
+                Vector2Int playerIndex = GetPlayerIndex();
+
+                MoveNumber("Player", playerIndex, playerIndex + new Vector2Int(-1, 0));
+            }
+
+            if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W))
+            {
+                // 上移動処理
+
+                Vector2Int playerIndex = GetPlayerIndex();
+
+                MoveNumber("Player", playerIndex, playerIndex + new Vector2Int(0, -1));
+
+            }
+            else if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S))
+            {
+                // 下移動処理
+
+                Vector2Int playerIndex = GetPlayerIndex();
+
+                MoveNumber("Player", playerIndex, playerIndex + new Vector2Int(0, 1));
+
+            }
         }
 
-        if (Input.GetKeyDown(KeyCode.LeftArrow))
+        for (int y = 0; y < field.GetLength(0); y++)
         {
-            // 左移動処理
+            for (int x = 0; x < field.GetLength(1); x++)
+            {
+                if (field[y, x] != null)
+                {
+                    objectsToRemove.Add(field[y, x]);
+                }
+            }
+        }
 
-            int playerIndex = GetPlayerIndex();
+        // もしクリアしていたら
+        if (IsCleard() && !isCleared)
+        {
+            // ゲームをクリア
+            isCleared = true;
 
-            MoveNumber(1, playerIndex, playerIndex - 1);
+            // ゲームオブジェクトのSetActiveメソッドを使い有効化
+            clearText.SetActive(true);
 
-            PrintArray();
+            // SEを再生（音が重ならないようにするため、すでに再生中でないことを確認）
+            if (!clearSound.isPlaying)
+            {
+                clearSound.Play();
+            }
+
+            // リスト内のオブジェクトを削除
+            foreach (GameObject obj in objectsToRemove)
+            {
+                obj.SetActive(false);
+            }
+        }
+
+        // Rキーが押されたらリセット
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            ResetGame();
         }
     }
 }
